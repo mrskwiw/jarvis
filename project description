@@ -3,3 +3,4 @@ It recognises its owners voice and only accepts commands from the owner.
 IT can add tools to itsself as needed by implementing apis. IT has access to tools exposed by docker. 
 IT uses teh Anthropic Agent SDK and supports tool lazy loading as defined by recent update to anthropic api.
 IT routes simple tasks to Haiku and uses Sonnet for complex tasks.
+Always prefer free services or free tiers of paid services when building JARVIS
