@@ -1,0 +1,5 @@
+JARVIS is a voice agent personal assistant that can write blogs, read and answer emails take and send phone calls. 
+It recognises its owners voice and only accepts commands from the owner. 
+IT can add tools to itsself as needed by implementing apis. IT has access to tools exposed by docker. 
+IT uses teh Anthropic Agent SDK and supports tool lazy loading as defined by recent update to anthropic api.
+IT routes simple tasks to Haiku and uses Sonnet for complex tasks.
