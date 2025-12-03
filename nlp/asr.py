@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
+import urllib.request
 from dataclasses import dataclass
 from typing import AsyncIterator, Iterable, Optional
 
@@ -33,16 +36,39 @@ class LocalWhisperASR:
 
 
 class CloudFallbackASR:
-    """Placeholder cloud ASR."""
+    """Cloud ASR with optional HTTP endpoint."""
 
-    def __init__(self, logger: Optional[RedactingLogger] = None) -> None:
+    def __init__(self, logger: Optional[RedactingLogger] = None, endpoint: Optional[str] = None) -> None:
         self.logger = logger or RedactingLogger(__name__)
+        self.endpoint = endpoint
 
     def transcribe(self, audio_frames, sample_rate: int) -> TranscriptionResult:
+        if self.endpoint:
+            try:
+                return self._call_endpoint(audio_frames, sample_rate)
+            except Exception as exc:  # pragma: no cover - network failures
+                self.logger.warning("Cloud ASR endpoint failed: %s", exc)
+
         text = "".join(frame.decode(errors="ignore") for frame in audio_frames)
         confidence = 0.85 if text else 0.0
         self.logger.debug("Cloud ASR produced text=%s confidence=%.2f", text, confidence)
         return TranscriptionResult(text=text.strip(), confidence=confidence, source="cloud_fallback")
+
+    def _call_endpoint(self, audio_frames, sample_rate: int) -> TranscriptionResult:
+        payload = {
+            "audio_b64": base64.b64encode(b"".join(audio_frames)).decode(),
+            "sample_rate": sample_rate,
+        }
+        req = urllib.request.Request(
+            self.endpoint,
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        text = data.get("text", "")
+        confidence = float(data.get("confidence", 0.0))
+        return TranscriptionResult(text=text, confidence=confidence, source="cloud_fallback_http")
 
 
 class ASRRouter:

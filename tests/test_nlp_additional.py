@@ -3,6 +3,9 @@ from nlp.router import LLMRouter
 from nlp.asr import ASRRouter, LocalWhisperASR, CloudFallbackASR
 import asyncio
 from tools.registry import ToolRegistry
+import json
+from types import SimpleNamespace
+import urllib.request
 
 
 def test_intent_classifier_tool_and_call_and_complexity():
@@ -70,6 +73,34 @@ def test_asr_router_streaming_timeout_and_fallback(monkeypatch):
 
     result_timeout = asyncio.run(consume_timeout())
     assert result_timeout.text.strip() or result_timeout.confidence == 0.0
+
+
+def test_cloud_asr_http_endpoint(monkeypatch):
+    responses = []
+
+    class FakeResponse:
+        def __init__(self, data):
+            self._data = data
+
+        def read(self):
+            return json.dumps(self._data).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def fake_urlopen(req, timeout=10):
+        responses.append(req)
+        return FakeResponse({"text": "hello", "confidence": 0.9})
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    cloud = CloudFallbackASR(endpoint="http://fake-endpoint/transcribe")
+    result = cloud.transcribe([b"abc"], sample_rate=16000)
+    assert result.text == "hello"
+    assert result.source == "cloud_fallback_http"
+    assert responses
 
 
 def test_low_confidence_triggers_clarification():
