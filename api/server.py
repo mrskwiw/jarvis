@@ -12,6 +12,7 @@ from nlp.router import LLMRouter
 from observability.health import audit_environment
 from observability.logging import RedactingLogger
 from observability.metrics import MetricsSink
+from observability.tracing import TraceRecorder
 from tools.registry import ToolRegistry
 from voice.listener import ContinuousListener, VerifiedAudio, load_wake_detector
 from voice.verification import (
@@ -90,17 +91,24 @@ class VoiceAgent:
         self.router = LLMRouter(tool_registry=self.tools)
         self.conversation = ConversationController(self.router, logger=self.logger)
         self.tts = CachedTTS() if os.environ.get("JARVIS_ENABLE_TTS") else None
+        self.tracer = TraceRecorder()
 
     async def listen_for_command(self) -> VerifiedAudio:
         return await self.listener.listen_for_command()
 
     async def process_audio_command(self) -> dict:
-        audio = await self.listen_for_command()
-        transcription = self.asr.transcribe(audio.frames, audio.sample_rate)
+        self.tracer.reset()
+        with self.tracer.span("listen"):
+            audio = await self.listen_for_command()
+        with self.tracer.span("asr"):
+            transcription = self.asr.transcribe(audio.frames, audio.sample_rate)
         self.metrics.increment("asr_calls")
-        intent = self.intent_classifier.classify(transcription.text)
-        payload = self.conversation.respond(intent, transcription.text, tools=self.tools.names())
+        with self.tracer.span("intent"):
+            intent = self.intent_classifier.classify(transcription.text)
+        with self.tracer.span("route"):
+            payload = self.conversation.respond(intent, transcription.text, tools=self.tools.names())
         payload["transcription"] = transcription
+        payload["trace"] = self.tracer.export()
         return payload
 
     def health(self) -> dict:

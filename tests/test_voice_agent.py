@@ -27,6 +27,7 @@ def test_voice_agent_process_audio(monkeypatch, tmp_path):
         assert payload["transcription"].text
         assert payload["transcription"].source in {"local_whisper", "cloud_fallback"}
         assert "context" in payload
+        assert "trace" in payload and len(payload["trace"]) >= 3
 
     asyncio.run(run())
 
