@@ -76,5 +76,9 @@ def test_api_enroll_and_transcribe(tmp_path):
     status, prom = _request(port, "GET", "/metrics/prom")
     assert status == 200
     assert isinstance(prom, dict) or isinstance(prom, str)
+    status, html = _request(port, "GET", "/console")
+    assert status == 200
+    if isinstance(html, str):
+        assert "<h1>JARVIS Console" in html
     server.shutdown()
     thread.join(timeout=1.0)

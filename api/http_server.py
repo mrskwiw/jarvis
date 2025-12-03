@@ -70,6 +70,17 @@ class JarvisRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(payload)
             return
+        if self.path == "/console":
+            if JarvisRequestHandler.agent is None:
+                JarvisRequestHandler.agent = build_agent()
+            html = self._render_console()
+            payload = html.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         _json_response(self, 404, {"error": "not found"})
 
     def do_POST(self) -> None:  # pragma: no cover - exercised via tests
@@ -139,6 +150,34 @@ class JarvisRequestHandler(BaseHTTPRequestHandler):
             for idx, sample in enumerate(samples):
                 lines.append(f"jarvis_timing_ms{{name=\"{name}\",sample=\"{idx}\"}} {sample}")
         return "\n".join(lines) + "\n"
+
+    def _render_console(self) -> str:
+        health = self.agent.health()
+        tools = self.agent.tools.describe()
+        counters = self.agent.metrics.snapshot()
+        return f"""
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>JARVIS Console</title>
+    <style>
+      body {{ font-family: Arial, sans-serif; margin: 1.5rem; }}
+      h1 {{ margin-bottom: 0.25rem; }}
+      pre {{ background: #f4f4f4; padding: 0.75rem; border-radius: 6px; }}
+    </style>
+  </head>
+  <body>
+    <h1>JARVIS Console</h1>
+    <h2>Health</h2>
+    <pre>{json.dumps(health, indent=2)}</pre>
+    <h2>Tools</h2>
+    <pre>{json.dumps(tools, indent=2)}</pre>
+    <h2>Metrics</h2>
+    <pre>{json.dumps(counters, indent=2)}</pre>
+  </body>
+</html>
+"""
 
 
 def run_server(host: str = "127.0.0.1", port: int = 0) -> Tuple[HTTPServer, int, threading.Thread]:
