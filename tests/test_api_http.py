@@ -23,7 +23,12 @@ def _request(port: int, method: str, path: str, body: dict | None = None):
     resp = conn.getresponse()
     data = resp.read()
     conn.close()
-    return resp.status, json.loads(data.decode() or "{}")
+    text = data.decode()
+    try:
+        parsed = json.loads(text or "{}")
+    except json.JSONDecodeError:
+        parsed = text
+    return resp.status, parsed
 
 
 def test_api_health_and_tools():
@@ -68,5 +73,8 @@ def test_api_enroll_and_transcribe(tmp_path):
     )
     assert status == 200
     assert "text" in body
+    status, prom = _request(port, "GET", "/metrics/prom")
+    assert status == 200
+    assert isinstance(prom, dict) or isinstance(prom, str)
     server.shutdown()
     thread.join(timeout=1.0)

@@ -59,6 +59,17 @@ class JarvisRequestHandler(BaseHTTPRequestHandler):
                 {"counters": self.agent.metrics.snapshot(), "timings": self.agent.metrics.timings},
             )
             return
+        if self.path == "/metrics/prom":
+            if JarvisRequestHandler.agent is None:
+                JarvisRequestHandler.agent = build_agent()
+            body = self._prometheus_metrics()
+            payload = body.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; version=0.0.4")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         _json_response(self, 404, {"error": "not found"})
 
     def do_POST(self) -> None:  # pragma: no cover - exercised via tests
@@ -117,6 +128,17 @@ class JarvisRequestHandler(BaseHTTPRequestHandler):
             200,
             {"text": result.text, "confidence": result.confidence, "source": result.source},
         )
+
+    def _prometheus_metrics(self) -> str:
+        lines = []
+        counters = JarvisRequestHandler.agent.metrics.snapshot()
+        timings = JarvisRequestHandler.agent.metrics.timings
+        for name, value in counters.items():
+            lines.append(f"jarvis_counter{{name=\"{name}\"}} {value}")
+        for name, samples in timings.items():
+            for idx, sample in enumerate(samples):
+                lines.append(f"jarvis_timing_ms{{name=\"{name}\",sample=\"{idx}\"}} {sample}")
+        return "\n".join(lines) + "\n"
 
 
 def run_server(host: str = "127.0.0.1", port: int = 0) -> Tuple[HTTPServer, int, threading.Thread]:
