@@ -59,6 +59,8 @@ class ContinuousListener:
     metrics: MetricsSink = field(default_factory=MetricsSink)
     max_command_seconds: float = 15.0
     silence_after_frames: int = 30
+    min_command_frames: int = 2
+    min_speech_frames: int = 2
 
     async def listen_for_command(self) -> VerifiedAudio:
         """Block until the wake word is heard, then capture and verify audio.
@@ -76,6 +78,11 @@ class ContinuousListener:
                 self.metrics.increment("wake_word_detected")
                 frames = await self._capture_command_frames(initial_frame=frame)
                 self.logger.debug("Captured %d frames", len(frames))
+                if not self._passes_speech_guardrails(frames):
+                    self.metrics.increment("speaker_rejected")
+                    self.metrics.increment("speech_rejected_short")
+                    self.logger.warning("Insufficient speech captured; rejecting command")
+                    raise VerificationError("Insufficient speech captured for verification")
                 try:
                     self.verifier.verify_owner(frames, self.sample_rate)
                     self.metrics.increment("speaker_verified")
@@ -105,6 +112,10 @@ class ContinuousListener:
                 self.logger.debug("Reached max command duration; stopping capture")
                 break
         return frames
+
+    def _passes_speech_guardrails(self, frames: List[bytes]) -> bool:
+        non_silent = sum(1 for frame in frames if frame and frame.strip(b"\x00"))
+        return len(frames) >= self.min_command_frames and non_silent >= self.min_speech_frames
 
 
 async def audio_stream_from_queue(queue: "asyncio.Queue[bytes]") -> AsyncIterator[bytes]:

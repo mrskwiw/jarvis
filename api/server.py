@@ -8,11 +8,17 @@ from dialogue.controller import ConversationController
 from nlp.asr import ASRRouter, CloudFallbackASR, LocalWhisperASR
 from nlp.intent import IntentClassifier
 from nlp.router import LLMRouter
+from observability.health import audit_environment
 from observability.logging import RedactingLogger
 from observability.metrics import MetricsSink
 from tools.registry import ToolRegistry
 from voice.listener import ContinuousListener, VerifiedAudio, WakeWordDetector
-from voice.verification import HashEmbeddingModel, SpeakerVerifier, VoiceprintStore
+from voice.verification import (
+    HashEmbeddingModel,
+    SpeakerVerifier,
+    VoiceprintStore,
+    require_voice_key,
+)
 
 
 class VoiceAgent:
@@ -25,6 +31,9 @@ class VoiceAgent:
     ) -> None:
         self.logger = RedactingLogger(__name__)
         self.metrics = metrics or MetricsSink()
+        env_check = audit_environment(["JARVIS_VOICE_KEY"])
+        env_check.raise_if_missing()
+        require_voice_key()
         verifier = SpeakerVerifier(HashEmbeddingModel(), VoiceprintStore(voiceprint_path))
         listener = ContinuousListener(
             wake_detector=WakeWordDetector(wake_word),
@@ -51,3 +60,10 @@ class VoiceAgent:
         payload = self.conversation.respond(intent, transcription.text, tools=self.tools.names())
         payload["transcription"] = transcription
         return payload
+
+    def health(self) -> dict:
+        env = audit_environment(["JARVIS_VOICE_KEY"])
+        return {
+            "env": env.to_dict(),
+            "voiceprint_exists": self.listener.verifier.store.exists(),
+        }

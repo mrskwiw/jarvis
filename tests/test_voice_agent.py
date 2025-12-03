@@ -29,3 +29,20 @@ def test_voice_agent_process_audio(monkeypatch, tmp_path):
         assert "context" in payload
 
     asyncio.run(run())
+
+
+def test_voice_agent_health(monkeypatch, tmp_path):
+    monkeypatch.setenv("JARVIS_VOICE_KEY", "agent-key")
+    queue: asyncio.Queue[bytes] = asyncio.Queue()
+    audio_source = audio_stream_from_queue(queue)
+    agent = VoiceAgent(audio_source=audio_source, voiceprint_path=str(tmp_path / "voiceprint"))
+
+    # Initially no voiceprint file.
+    health = agent.health()
+    assert health["env"]["ok"] is True
+    assert health["voiceprint_exists"] is False
+
+    # After enrollment, the health should reflect presence.
+    agent.listener.verifier.enroll_owner([b"jarvis"], sample_rate=agent.listener.sample_rate)
+    health_after = agent.health()
+    assert health_after["voiceprint_exists"] is True
