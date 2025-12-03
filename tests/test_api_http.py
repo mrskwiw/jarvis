@@ -36,6 +36,7 @@ def test_api_health_and_tools():
     status, body = _request(port, "GET", "/health")
     assert status == 200
     assert "env" in body
+    assert "tools" in body
 
     status, body = _request(port, "GET", "/tools")
     assert status == 200

@@ -12,6 +12,7 @@ from nlp.router import LLMRouter
 from observability.health import audit_environment
 from observability.logging import RedactingLogger
 from observability.metrics import MetricsSink
+from observability.health import tool_catalog_status
 from observability.tracing import TraceRecorder
 from tools.registry import ToolRegistry
 from voice.listener import ContinuousListener, VerifiedAudio, load_wake_detector
@@ -113,7 +114,9 @@ class VoiceAgent:
 
     def health(self) -> dict:
         env = audit_environment(["JARVIS_VOICE_KEY"])
+        tools_status = tool_catalog_status(self.tools.describe())
         return {
             "env": env.to_dict(),
             "voiceprint_exists": self.listener.verifier.store.exists(),
+            "tools": tools_status,
         }

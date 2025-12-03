@@ -32,3 +32,7 @@ def audit_environment(required_vars: Iterable[str]) -> EnvCheck:
         else:
             missing.append(var)
     return EnvCheck(present=present, missing=missing)
+
+
+def tool_catalog_status(tools: Dict[str, Dict[str, object]]) -> Dict[str, object]:
+    return {"tool_count": len(tools), "free_tier_only": [name for name, meta in tools.items() if meta.get("free_tier_only")]}
