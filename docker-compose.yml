@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  jarvis:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      - JARVIS_VOICE_KEY=${JARVIS_VOICE_KEY:-change-me}
+    command: ["python", "-m", "http.server", "8000"]
+    ports:
+      - "8000:8000"
+  asr:
+    image: ghcr.io/ggerganov/whisper.cpp:master
+    command: ["sleep", "infinity"]
+    profiles: ["asr"]
