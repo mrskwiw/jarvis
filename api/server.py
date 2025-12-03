@@ -20,6 +20,7 @@ from voice.verification import (
     VoiceprintStore,
     require_voice_key,
 )
+from voice.tts import CachedTTS
 
 
 class VoiceAgent:
@@ -88,6 +89,7 @@ class VoiceAgent:
         self.intent_classifier = IntentClassifier()
         self.router = LLMRouter(tool_registry=self.tools)
         self.conversation = ConversationController(self.router, logger=self.logger)
+        self.tts = CachedTTS() if os.environ.get("JARVIS_ENABLE_TTS") else None
 
     async def listen_for_command(self) -> VerifiedAudio:
         return await self.listener.listen_for_command()

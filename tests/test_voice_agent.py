@@ -33,6 +33,7 @@ def test_voice_agent_process_audio(monkeypatch, tmp_path):
 
 def test_voice_agent_health(monkeypatch, tmp_path):
     monkeypatch.setenv("JARVIS_VOICE_KEY", "agent-key")
+    monkeypatch.delenv("JARVIS_EMBEDDING_BACKEND", raising=False)
     queue: asyncio.Queue[bytes] = asyncio.Queue()
     audio_source = audio_stream_from_queue(queue)
     agent = VoiceAgent(audio_source=audio_source, voiceprint_path=str(tmp_path / "voiceprint"))
@@ -46,3 +47,14 @@ def test_voice_agent_health(monkeypatch, tmp_path):
     agent.listener.verifier.enroll_owner([b"jarvis"], sample_rate=agent.listener.sample_rate)
     health_after = agent.health()
     assert health_after["voiceprint_exists"] is True
+
+
+def test_voice_agent_tts_optional(monkeypatch, tmp_path):
+    monkeypatch.setenv("JARVIS_VOICE_KEY", "agent-key")
+    monkeypatch.setenv("JARVIS_ENABLE_TTS", "1")
+    queue: asyncio.Queue[bytes] = asyncio.Queue()
+    audio_source = audio_stream_from_queue(queue)
+    agent = VoiceAgent(audio_source=audio_source, voiceprint_path=str(tmp_path / "voiceprint"))
+    assert agent.tts is not None
+    audio = agent.tts.synthesize("hello")
+    assert audio == b"hello"

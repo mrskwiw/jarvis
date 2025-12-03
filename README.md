@@ -47,7 +47,10 @@ See `ROADMAP.md` for planned work on enrollment UX, ASR/TTS integrations, Anthro
 - Start server: `python -m api.http_server --port 8000`
 - Endpoints:
   - `GET /health` — env + voiceprint existence
-  - `GET /tools` — tool catalog (schemas, free-tier flags)
-  - `GET /metrics` — counters and timing snapshots
-  - `POST /enroll` — JSON `{audio_path, voiceprint_path?, sample_rate?, chunk_size?}`
-  - `POST /transcribe` — JSON `{frames: [base64 frames], sample_rate?}`
+- `GET /tools` — tool catalog (schemas, free-tier flags)
+- `GET /metrics` — counters and timing snapshots
+- `POST /enroll` — JSON `{audio_path, voiceprint_path?, sample_rate?, chunk_size?}`
+- `POST /transcribe` — JSON `{frames: [base64 frames], sample_rate?}`
+
+## Optional TTS
+- Set `JARVIS_ENABLE_TTS=1` to enable a simple TTS backend (placeholder, returns UTF-8 bytes).
