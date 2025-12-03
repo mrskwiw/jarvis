@@ -59,20 +59,8 @@ class ASRRouter:
         return self.cloud.transcribe(audio_frames, sample_rate)
 
     async def transcribe_streaming(self, audio_source: AsyncIterator[bytes], sample_rate: int) -> TranscriptionResult:
-        """Stream audio to local ASR first, then fall back to cloud with timeout."""
+        """Stream audio once, route to local first, then optional cloud fallback using same frames."""
 
-        local_text = await self._stream_collect(audio_source, sample_rate, prefer_cloud=False)
-        if local_text.confidence >= self.threshold:
-            return local_text
-        return await self._stream_collect(audio_source, sample_rate, prefer_cloud=True)
-
-    async def _stream_collect(
-        self,
-        audio_source: AsyncIterator[bytes],
-        sample_rate: int,
-        prefer_cloud: bool,
-    ) -> TranscriptionResult:
-        backend = self.cloud if prefer_cloud else self.local
         chunks: list[bytes] = []
 
         async def consume():
@@ -84,7 +72,10 @@ class ASRRouter:
         except asyncio.TimeoutError:
             pass
 
-        result = backend.transcribe(chunks, sample_rate)
-        result.source = f"{result.source}{'_stream' if prefer_cloud else '_local_stream'}"
-        result.latency_ms = None  # placeholder; could be wired to wall clock if needed
-        return result
+        local_result = self.local.transcribe(chunks, sample_rate)
+        local_result.source = f"{local_result.source}_stream"
+        if local_result.confidence >= self.threshold:
+            return local_result
+        cloud_result = self.cloud.transcribe(chunks, sample_rate)
+        cloud_result.source = f"{cloud_result.source}_stream"
+        return cloud_result

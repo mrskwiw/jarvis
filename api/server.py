@@ -47,10 +47,10 @@ class VoiceAgent:
         )
         self.listener = listener
         self.asr = ASRRouter(LocalWhisperASR(self.logger), CloudFallbackASR(self.logger))
-        self.intent_classifier = IntentClassifier()
-        self.router = LLMRouter()
-        self.conversation = ConversationController(self.router, logger=self.logger)
         self.tools = ToolRegistry(logger=self.logger)
+        self.intent_classifier = IntentClassifier()
+        self.router = LLMRouter(tool_registry=self.tools)
+        self.conversation = ConversationController(self.router, logger=self.logger)
 
     async def listen_for_command(self) -> VerifiedAudio:
         return await self.listener.listen_for_command()

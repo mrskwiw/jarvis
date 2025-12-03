@@ -16,10 +16,14 @@ class ToolRegistry:
         self._loaders: Dict[str, Callable[[], object]] = {}
         self._cache: Dict[str, object] = {}
         self._require_owner = True
+        self._schemas: Dict[str, Dict[str, object]] = {}
 
     def register(self, name: str, loader: Callable[[], object]) -> None:
         self._loaders[name] = loader
         self.logger.debug("Registered tool %s", name)
+
+    def register_schema(self, name: str, schema: Dict[str, object]) -> None:
+        self._schemas[name] = schema
 
     def get(self, name: str, owner_verified: bool = False) -> object:
         if self._require_owner and not owner_verified:
@@ -33,3 +37,6 @@ class ToolRegistry:
 
     def names(self):
         return list(self._loaders.keys())
+
+    def describe(self) -> Dict[str, Dict[str, object]]:
+        return {name: self._schemas.get(name, {}) for name in self._loaders.keys()}
