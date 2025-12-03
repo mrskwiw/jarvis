@@ -1,8 +1,9 @@
 """ASR router supporting local and cloud backends."""
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
-from typing import Optional
+from typing import AsyncIterator, Iterable, Optional
 
 from observability.logging import RedactingLogger
 
@@ -12,6 +13,7 @@ class TranscriptionResult:
     text: str
     confidence: float
     source: str
+    latency_ms: Optional[float] = None
 
 
 class LocalWhisperASR:
@@ -48,9 +50,41 @@ class ASRRouter:
         self.local = local
         self.cloud = cloud
         self.threshold = threshold
+        self.stream_timeout = 5.0
 
     def transcribe(self, audio_frames, sample_rate: int) -> TranscriptionResult:
         local_result = self.local.transcribe(audio_frames, sample_rate)
         if local_result.confidence >= self.threshold:
             return local_result
         return self.cloud.transcribe(audio_frames, sample_rate)
+
+    async def transcribe_streaming(self, audio_source: AsyncIterator[bytes], sample_rate: int) -> TranscriptionResult:
+        """Stream audio to local ASR first, then fall back to cloud with timeout."""
+
+        local_text = await self._stream_collect(audio_source, sample_rate, prefer_cloud=False)
+        if local_text.confidence >= self.threshold:
+            return local_text
+        return await self._stream_collect(audio_source, sample_rate, prefer_cloud=True)
+
+    async def _stream_collect(
+        self,
+        audio_source: AsyncIterator[bytes],
+        sample_rate: int,
+        prefer_cloud: bool,
+    ) -> TranscriptionResult:
+        backend = self.cloud if prefer_cloud else self.local
+        chunks: list[bytes] = []
+
+        async def consume():
+            async for frame in audio_source:
+                chunks.append(frame)
+
+        try:
+            await asyncio.wait_for(consume(), timeout=self.stream_timeout)
+        except asyncio.TimeoutError:
+            pass
+
+        result = backend.transcribe(chunks, sample_rate)
+        result.source = f"{result.source}{'_stream' if prefer_cloud else '_local_stream'}"
+        result.latency_ms = None  # placeholder; could be wired to wall clock if needed
+        return result

@@ -147,3 +147,32 @@ def test_wake_backend_factory_errors(monkeypatch):
     monkeypatch.delenv("JARVIS_WAKE_BACKEND", raising=False)
     with pytest.raises(ImportError):
         load_wake_detector("jarvis", backend="porcupine")
+
+
+def test_latency_metric_and_vad(monkeypatch):
+    class AcceptVerifier:
+        def verify_owner(self, frames, sample_rate):
+            return 0.9
+
+    async def run():
+        queue: asyncio.Queue[bytes] = asyncio.Queue()
+        audio_source = audio_stream_from_queue(queue)
+        metrics = MetricsSink()
+        listener = ContinuousListener(
+            wake_detector=WakeWordDetector("jarvis"),
+            verifier=AcceptVerifier(),
+            audio_source=audio_source,
+            silence_after_frames=1,
+            metrics=metrics,
+            min_speech_frames=1,
+            energy_threshold=1.0,
+        )
+        queue.put_nowait(b"Jarvis wake")
+        queue.put_nowait(b"\x01\x01")  # non-silent speech frame
+        queue.put_nowait(b"\x00\x00")  # silence to stop
+        queue.put_nowait(None)
+        audio = await listener.listen_for_command()
+        assert len(audio.frames) >= 2
+        assert metrics.timings["latency_wake_to_verify_ms"][0] >= 0.0
+
+    asyncio.run(run())

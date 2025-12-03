@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import AsyncIterator, Callable, Iterable, List, Optional
 
@@ -61,6 +62,7 @@ class ContinuousListener:
     silence_after_frames: int = 30
     min_command_frames: int = 2
     min_speech_frames: int = 2
+    energy_threshold: float = 50.0
 
     async def listen_for_command(self) -> VerifiedAudio:
         """Block until the wake word is heard, then capture and verify audio.
@@ -76,6 +78,7 @@ class ContinuousListener:
             if self.wake_detector.heard(frame):
                 self.logger.info("Wake word detected; capturing command audio")
                 self.metrics.increment("wake_word_detected")
+                start_time = time.monotonic()
                 frames = await self._capture_command_frames(initial_frame=frame)
                 self.logger.debug("Captured %d frames", len(frames))
                 if not self._passes_speech_guardrails(frames):
@@ -86,6 +89,8 @@ class ContinuousListener:
                 try:
                     self.verifier.verify_owner(frames, self.sample_rate)
                     self.metrics.increment("speaker_verified")
+                    latency_ms = (time.monotonic() - start_time) * 1000.0
+                    self.metrics.record_timing("latency_wake_to_verify_ms", latency_ms)
                     self.logger.info("Speaker verified; emitting audio for downstream processing")
                     return VerifiedAudio(frames=frames, sample_rate=self.sample_rate)
                 except VerificationError:
@@ -101,7 +106,7 @@ class ContinuousListener:
 
         async for frame in self.audio_source:
             frames.append(frame)
-            if not frame.strip(b"\x00"):
+            if self._is_silent(frame):
                 silence_counter += 1
             else:
                 silence_counter = 0
@@ -114,8 +119,24 @@ class ContinuousListener:
         return frames
 
     def _passes_speech_guardrails(self, frames: List[bytes]) -> bool:
-        non_silent = sum(1 for frame in frames if frame and frame.strip(b"\x00"))
+        non_silent = sum(1 for frame in frames if not self._is_silent(frame))
         return len(frames) >= self.min_command_frames and non_silent >= self.min_speech_frames
+
+    def _is_silent(self, frame: bytes) -> bool:
+        if not frame:
+            return True
+        try:
+            # Treat frame as PCM int16; fall back to zero-check on decode failures.
+            import numpy as np  # type: ignore
+
+            pcm = np.frombuffer(frame, dtype=np.int16)
+            if pcm.size == 0:
+                return True
+            energy = float(np.mean(np.abs(pcm)))
+        except Exception:
+            # Fallback: consider bytes with non-zero payload as non-silent.
+            return not frame.strip(b"\x00")
+        return energy < self.energy_threshold
 
 
 def _porcupine_detector_factory(wake_word: str) -> Callable[[bytes], bool]:
