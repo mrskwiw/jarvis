@@ -9,6 +9,7 @@ Voice-first personal assistant with wake-word detection, speaker verification, A
   - Bash: `export JARVIS_VOICE_KEY="your-random-key"`
 - Rotate keys by setting a new value for `JARVIS_VOICE_KEY` and re-enrolling the owner voiceprint (old encrypted files become invalid; remove them after rotation).
 - For mic streaming: `pip install sounddevice` (system audio drivers/tools may be required).
+- Wake word backend: default fallback uses simple text heuristic. To use Porcupine, set `JARVIS_WAKE_BACKEND=porcupine` and install `pvporcupine` + `numpy`.
 
 ## Enrollment (owner voiceprint)
 1) Record a short raw/PCM clip of your voice saying the wake word and a phrase (16 kHz, mono).

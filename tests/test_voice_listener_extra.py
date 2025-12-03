@@ -3,7 +3,12 @@ import asyncio
 import pytest
 
 from observability.metrics import MetricsSink
-from voice.listener import ContinuousListener, WakeWordDetector, audio_stream_from_queue
+from voice.listener import (
+    ContinuousListener,
+    WakeWordDetector,
+    audio_stream_from_queue,
+    load_wake_detector,
+)
 from voice.verification import VerificationError
 
 
@@ -128,3 +133,17 @@ def test_listen_for_command_rejection_and_missing_wake():
     asyncio.run(run_short_speech())
     asyncio.run(run_reject())
     asyncio.run(run_no_wake())
+
+
+def test_wake_backend_factory_errors(monkeypatch):
+    # Default fallback returns detector
+    detector = load_wake_detector("jarvis")
+    assert detector.heard(b"Jarvis here")
+
+    with pytest.raises(ValueError):
+        load_wake_detector("jarvis", backend="unknown-backend")
+
+    # Porcupine should raise ImportError when dependency missing
+    monkeypatch.delenv("JARVIS_WAKE_BACKEND", raising=False)
+    with pytest.raises(ImportError):
+        load_wake_detector("jarvis", backend="porcupine")

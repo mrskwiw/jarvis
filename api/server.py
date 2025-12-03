@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import AsyncIterator, Optional
 
 from dialogue.controller import ConversationController
@@ -12,10 +13,10 @@ from observability.health import audit_environment
 from observability.logging import RedactingLogger
 from observability.metrics import MetricsSink
 from tools.registry import ToolRegistry
-from voice.listener import ContinuousListener, VerifiedAudio, WakeWordDetector
+from voice.listener import ContinuousListener, VerifiedAudio, load_wake_detector
 from voice.verification import (
-    HashEmbeddingModel,
     SpeakerVerifier,
+    load_embedding_model,
     VoiceprintStore,
     require_voice_key,
 )
@@ -34,9 +35,11 @@ class VoiceAgent:
         env_check = audit_environment(["JARVIS_VOICE_KEY"])
         env_check.raise_if_missing()
         require_voice_key()
-        verifier = SpeakerVerifier(HashEmbeddingModel(), VoiceprintStore(voiceprint_path))
+        embedding_backend = os.environ.get("JARVIS_EMBEDDING_BACKEND", "hash")
+        wake_backend = os.environ.get("JARVIS_WAKE_BACKEND", "fallback")
+        verifier = SpeakerVerifier(load_embedding_model(embedding_backend), VoiceprintStore(voiceprint_path))
         listener = ContinuousListener(
-            wake_detector=WakeWordDetector(wake_word),
+            wake_detector=load_wake_detector(wake_word, backend=wake_backend),
             verifier=verifier,
             audio_source=audio_source,
             logger=self.logger,

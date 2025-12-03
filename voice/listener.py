@@ -118,6 +118,47 @@ class ContinuousListener:
         return len(frames) >= self.min_command_frames and non_silent >= self.min_speech_frames
 
 
+def _porcupine_detector_factory(wake_word: str) -> Callable[[bytes], bool]:
+    """Wrap pvporcupine if installed; otherwise raise a clear ImportError."""
+
+    try:
+        import pvporcupine  # type: ignore
+        import numpy as np  # type: ignore
+    except Exception as exc:  # pragma: no cover - exercised via factory error path
+        raise ImportError(
+            "Porcupine wake-word backend requested but 'pvporcupine' (and numpy) is not installed. "
+            "Install with: pip install pvporcupine numpy"
+        ) from exc
+
+    porcupine = pvporcupine.create(keywords=[wake_word])
+
+    def detector(frame: bytes) -> bool:
+        if not frame:
+            return False
+        pcm = np.frombuffer(frame, dtype=np.int16)
+        if pcm.size == 0:
+            return False
+        return porcupine.process(pcm) >= 0
+
+    return detector
+
+
+def load_wake_detector(wake_word: str, backend: str = "fallback") -> WakeWordDetector:
+    """Factory for wake-word detectors.
+
+    Supported backends:
+    - "fallback" (default): simple text-based heuristic suitable for tests.
+    - "porcupine": pvporcupine-based detector (requires dependency).
+    """
+
+    normalized = backend.lower()
+    if normalized in ("fallback", "simple"):
+        return WakeWordDetector(wake_word)
+    if normalized == "porcupine":
+        return WakeWordDetector(wake_word, detector=_porcupine_detector_factory(wake_word))
+    raise ValueError(f"Unknown wake-word backend: {backend}")
+
+
 async def audio_stream_from_queue(queue: "asyncio.Queue[bytes]") -> AsyncIterator[bytes]:
     """Utility to convert an asyncio queue into an audio source iterator."""
 
