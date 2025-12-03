@@ -24,7 +24,11 @@ def test_llm_router_includes_tools_payload():
     registry = ToolRegistry()
     registry.register_schema(
         "email",
-        {"description": "Send email", "input_schema": {"type": "object", "properties": {"to": {"type": "string"}}}},
+        {
+            "description": "Send email",
+            "input_schema": {"type": "object", "properties": {"to": {"type": "string"}}, "required": ["to"]},
+            "free_tier_only": True,
+        },
     )
     router = LLMRouter(default_system_prompt="system", tool_registry=registry)
     intent = IntentClassifier().classify("send an email")

@@ -48,6 +48,43 @@ class VoiceAgent:
         self.listener = listener
         self.asr = ASRRouter(LocalWhisperASR(self.logger), CloudFallbackASR(self.logger))
         self.tools = ToolRegistry(logger=self.logger)
+        # Register minimal tool schemas for advanced tool use payloads.
+        self.tools.register_schema(
+            "email",
+            {
+                "description": "Send an email via configured provider",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"}},
+                    "required": ["to", "subject", "body"],
+                },
+                "free_tier_only": True,
+            },
+        )
+        self.tools.register_schema(
+            "call",
+            {
+                "description": "Place a phone call",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"to": {"type": "string"}, "message": {"type": "string"}},
+                    "required": ["to", "message"],
+                },
+                "free_tier_only": True,
+            },
+        )
+        self.tools.register_schema(
+            "blog",
+            {
+                "description": "Draft or publish a blog post",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"title": {"type": "string"}, "body": {"type": "string"}},
+                    "required": ["title", "body"],
+                },
+                "free_tier_only": True,
+            },
+        )
         self.intent_classifier = IntentClassifier()
         self.router = LLMRouter(tool_registry=self.tools)
         self.conversation = ConversationController(self.router, logger=self.logger)
