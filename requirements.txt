@@ -1,0 +1,4 @@
+numpy
+pvporcupine
+resemblyzer
+sounddevice

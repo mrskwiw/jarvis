@@ -1,13 +1,14 @@
 version: "3.9"
 services:
   jarvis:
-    image: python:3.11-slim
-    working_dir: /app
-    volumes:
-      - ./:/app
+    build: .
+    image: jarvis:latest
     environment:
       - JARVIS_VOICE_KEY=${JARVIS_VOICE_KEY:-change-me}
-    command: ["python", "-m", "http.server", "8000"]
+      - JARVIS_WAKE_BACKEND=${JARVIS_WAKE_BACKEND:-fallback}
+      - JARVIS_EMBEDDING_BACKEND=${JARVIS_EMBEDDING_BACKEND:-hash}
+      - JARVIS_ENABLE_TTS=${JARVIS_ENABLE_TTS:-0}
+    command: ["python", "-m", "api.http_server", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8000:8000"
   asr:
