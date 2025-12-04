@@ -18,6 +18,7 @@ from tools.registry import ToolRegistry
 from tools.email import EmailService, pop_setup_tool_form
 from tools.calls import CallService
 from tools.blogging import BloggingService
+from tools.docker_discovery import discover_docker_tools
 from voice.listener import ContinuousListener, VerifiedAudio, load_wake_detector
 from voice.verification import (
     SpeakerVerifier,
@@ -119,6 +120,16 @@ class VoiceAgent:
             },
         )
         self.tools.register("pop_setup", pop_setup_tool_form)
+        for tool in discover_docker_tools():
+            name = tool.get("name")
+            schema = {
+                "description": tool.get("description", f"Docker tool {name}"),
+                "input_schema": tool.get("input_schema", {"type": "object", "properties": {}}),
+                "free_tier_only": tool.get("free_tier_only", True),
+            }
+            if name:
+                self.tools.register_schema(name, schema)
+                self.tools.register(name, lambda t=tool: t)
         self.intent_classifier = IntentClassifier()
         self.router = LLMRouter(tool_registry=self.tools)
         self.conversation = ConversationController(self.router, logger=self.logger)

@@ -89,3 +89,12 @@ def test_gmail_oauth_and_pop(monkeypatch):
     assert "client_id=cid" in url
     form = pop_setup_tool_form()
     assert "fields" in form
+
+
+def test_docker_discovery(monkeypatch):
+    from tools.docker_discovery import discover_docker_tools
+
+    payload = '[{"name": "docker_tool", "description": "from docker", "input_schema": {"type": "object", "properties": {"x": {"type": "string"}}, "required": ["x"]}}]'
+    monkeypatch.setenv("JARVIS_DOCKER_TOOLS", payload)
+    tools = discover_docker_tools()
+    assert tools and tools[0]["name"] == "docker_tool"
