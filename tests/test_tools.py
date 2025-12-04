@@ -74,6 +74,25 @@ def test_tool_registry_describe_and_free_tier(monkeypatch):
     assert desc["email"]["free_tier_only"] is True
 
 
+def test_tool_registry_challenge_phrase(monkeypatch):
+    monkeypatch.setenv("JARVIS_CHALLENGE_PHRASE", "open-sesame")
+    registry = ToolRegistry()
+    registry.register("secure_tool", lambda: {"secure": True})
+    registry.register_schema(
+        "secure_tool",
+        {"input_schema": {"type": "object", "properties": {}, "required": []}, "free_tier_only": True},
+    )
+
+    with pytest.raises(PermissionError):
+        registry.execute("secure_tool", {}, owner_verified=True)
+
+    with pytest.raises(PermissionError):
+        registry.execute("secure_tool", {}, owner_verified=True, challenge_response="wrong")
+
+    result = registry.execute("secure_tool", {}, owner_verified=True, challenge_response="open-sesame")
+    assert result["ok"] is True
+
+
 def test_gmail_oauth_and_pop(monkeypatch):
     monkeypatch.setenv("GMAIL_CLIENT_ID", "cid")
     monkeypatch.setenv("GMAIL_CLIENT_SECRET", "secret")
