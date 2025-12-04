@@ -91,3 +91,18 @@ class EmailService:
 
     def draft_reply(self, to: str, subject: str, body: str) -> EmailMessage:
         return EmailMessage(subject=subject, sender=to, body=body)
+
+
+def pop_setup_tool_form() -> dict:
+    """Return a form schema for collecting POP settings."""
+    return {
+        "title": "Configure POP Email",
+        "fields": [
+            {"name": "host", "label": "POP Host", "type": "string", "required": True},
+            {"name": "user", "label": "POP Username", "type": "string", "required": True},
+            {"name": "password", "label": "POP Password", "type": "string", "required": True},
+            {"name": "port", "label": "Port", "type": "number", "required": False, "default": 995},
+            {"name": "use_ssl", "label": "Use SSL", "type": "boolean", "required": False, "default": True},
+        ],
+        "submit_label": "Save POP Settings",
+    }

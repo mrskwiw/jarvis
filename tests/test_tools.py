@@ -2,7 +2,7 @@ import pytest
 
 from tools.blogging import BloggingService
 from tools.calls import CallService
-from tools.email import EmailService, gmail_oauth_authorize_url
+from tools.email import EmailService, gmail_oauth_authorize_url, pop_setup_tool_form
 from tools.registry import PermissionError, ToolRegistry
 
 
@@ -87,3 +87,5 @@ def test_gmail_oauth_and_pop(monkeypatch):
     assert pop_result["provider"] == "pop"
     url = gmail_oauth_authorize_url("cid", "https://app/callback")
     assert "client_id=cid" in url
+    form = pop_setup_tool_form()
+    assert "fields" in form

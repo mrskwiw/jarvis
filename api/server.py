@@ -15,7 +15,7 @@ from observability.metrics import MetricsSink
 from observability.health import tool_catalog_status
 from observability.tracing import TraceRecorder
 from tools.registry import ToolRegistry
-from tools.email import EmailService
+from tools.email import EmailService, pop_setup_tool_form
 from tools.calls import CallService
 from tools.blogging import BloggingService
 from voice.listener import ContinuousListener, VerifiedAudio, load_wake_detector
@@ -100,6 +100,25 @@ class VoiceAgent:
             },
         )
         self.tools.register("blog", lambda: BloggingService())
+        self.tools.register_schema(
+            "pop_setup",
+            {
+                "description": "Collect POP email configuration via form",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "host": {"type": "string"},
+                        "user": {"type": "string"},
+                        "password": {"type": "string"},
+                        "port": {"type": "number"},
+                        "use_ssl": {"type": "boolean"},
+                    },
+                    "required": ["host", "user", "password"],
+                },
+                "free_tier_only": True,
+            },
+        )
+        self.tools.register("pop_setup", pop_setup_tool_form)
         self.intent_classifier = IntentClassifier()
         self.router = LLMRouter(tool_registry=self.tools)
         self.conversation = ConversationController(self.router, logger=self.logger)
