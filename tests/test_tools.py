@@ -2,7 +2,7 @@ import pytest
 
 from tools.blogging import BloggingService
 from tools.calls import CallService
-from tools.email import EmailService
+from tools.email import EmailService, gmail_oauth_authorize_url
 from tools.registry import PermissionError, ToolRegistry
 
 
@@ -37,6 +37,9 @@ def test_email_service_placeholders():
     assert reply.subject == "subject"
     assert reply.body == "body"
 
+    send_result = service.send_email("to@example.com", "subject", "body")
+    assert send_result["provider"] == "dry-run"
+
 
 def test_tool_registry_permissions_and_caching():
     registry = ToolRegistry()
@@ -69,3 +72,18 @@ def test_tool_registry_describe_and_free_tier(monkeypatch):
     desc = registry.describe()
     assert desc["email"]["description"] == "Email tool"
     assert desc["email"]["free_tier_only"] is True
+
+
+def test_gmail_oauth_and_pop(monkeypatch):
+    monkeypatch.setenv("GMAIL_CLIENT_ID", "cid")
+    monkeypatch.setenv("GMAIL_CLIENT_SECRET", "secret")
+    monkeypatch.setenv("GMAIL_REFRESH_TOKEN", "refresh")
+    gmail = EmailService(provider="gmail")
+    result = gmail.send_email("to@example.com", "hi", "body")
+    assert result["provider"] == "gmail"
+
+    pop = EmailService(provider="pop", pop_host="pop.example.com", pop_user="user")
+    pop_result = pop.send_email("to@example.com", "hi", "body")
+    assert pop_result["provider"] == "pop"
+    url = gmail_oauth_authorize_url("cid", "https://app/callback")
+    assert "client_id=cid" in url
