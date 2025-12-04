@@ -72,13 +72,24 @@ class CloudFallbackASR:
 
 
 class ASRRouter:
-    def __init__(self, local: LocalWhisperASR, cloud: CloudFallbackASR, threshold: float = 0.7) -> None:
+    def __init__(
+        self,
+        local: LocalWhisperASR,
+        cloud: CloudFallbackASR,
+        threshold: float = 0.7,
+        prefer_cloud: bool = False,
+    ) -> None:
         self.local = local
         self.cloud = cloud
         self.threshold = threshold
         self.stream_timeout = 5.0
+        self.prefer_cloud = prefer_cloud
 
     def transcribe(self, audio_frames, sample_rate: int) -> TranscriptionResult:
+        if self.prefer_cloud:
+            cloud_result = self.cloud.transcribe(audio_frames, sample_rate)
+            if cloud_result.confidence >= self.threshold:
+                return cloud_result
         local_result = self.local.transcribe(audio_frames, sample_rate)
         if local_result.confidence >= self.threshold:
             return local_result

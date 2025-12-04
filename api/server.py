@@ -49,7 +49,13 @@ class VoiceAgent:
             metrics=self.metrics,
         )
         self.listener = listener
-        self.asr = ASRRouter(LocalWhisperASR(self.logger), CloudFallbackASR(self.logger))
+        asr_endpoint = os.environ.get("JARVIS_ASR_ENDPOINT")
+        prefer_cloud = bool(asr_endpoint)
+        self.asr = ASRRouter(
+            LocalWhisperASR(self.logger),
+            CloudFallbackASR(self.logger, endpoint=asr_endpoint),
+            prefer_cloud=prefer_cloud,
+        )
         self.tools = ToolRegistry(logger=self.logger)
         # Register minimal tool schemas for advanced tool use payloads.
         self.tools.register_schema(

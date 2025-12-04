@@ -8,10 +8,16 @@ services:
       - JARVIS_WAKE_BACKEND=${JARVIS_WAKE_BACKEND:-fallback}
       - JARVIS_EMBEDDING_BACKEND=${JARVIS_EMBEDDING_BACKEND:-hash}
       - JARVIS_ENABLE_TTS=${JARVIS_ENABLE_TTS:-0}
+      - JARVIS_ASR_ENDPOINT=${JARVIS_ASR_ENDPOINT:-http://asr:9000/inference}
     command: ["python", "-m", "api.http_server", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8000:8000"
+    depends_on:
+      - asr
   asr:
     image: ghcr.io/ggerganov/whisper.cpp:master
-    command: ["sleep", "infinity"]
+    command: ["./server", "-m", "/models/ggml-base.en.bin", "-l", "en", "-t", "4", "--host", "0.0.0.0", "--port", "9000"]
+    volumes:
+      - ./models:/models
     profiles: ["asr"]
+
