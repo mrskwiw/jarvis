@@ -15,7 +15,7 @@ class VerificationError(Exception):
 
 class EmbeddingModel(Protocol):
     def embed(self, frames: Iterable[bytes], sample_rate: int) -> List[float]:
-        ...
+        ...  # pragma: no cover - protocol stub
 
 
 class HashEmbeddingModel:
@@ -42,6 +42,53 @@ class HashEmbeddingModel:
         return [value / float(total) for value in accum]
 
 
+class ResemblyzerEmbeddingModel:
+    """Optional real embedding backend using resemblyzer.
+
+    This adapter is loaded only when requested, to keep the dependency optional.
+    """
+
+    def __init__(self) -> None:
+        try:
+            from resemblyzer import VoiceEncoder  # type: ignore
+        except Exception as exc:  # pragma: no cover - exercised via factory error path
+            raise ImportError(
+                "Resemblyzer backend requested but 'resemblyzer' is not installed. "
+                "Install with: pip install resemblyzer"
+            ) from exc
+        self._encoder = VoiceEncoder()
+
+    def embed(self, frames: Iterable[bytes], sample_rate: int) -> List[float]:
+        # Resemblyzer expects a waveform; we concatenate frames and let it handle framing.
+        # This keeps compatibility with the existing pipeline without changing the call site.
+        import numpy as np  # type: ignore
+
+        if sample_rate <= 0:
+            raise ValueError("sample_rate must be positive for embedding")
+        if not frames:
+            return []
+        waveform = np.frombuffer(b"".join(frames), dtype=np.int16).astype(np.float32) / 32768.0
+        if waveform.size == 0:
+            return []
+        return self._encoder.embed_utterance(waveform, sample_rate=sample_rate).tolist()
+
+
+def load_embedding_model(name: str = "hash") -> EmbeddingModel:
+    """Factory for embedding models.
+
+    Supported names:
+    - "hash" (default): lightweight, dependency-free hashing approximation.
+    - "resemblyzer": real speaker encoder; requires `pip install resemblyzer`.
+    """
+
+    normalized = name.lower()
+    if normalized == "hash":
+        return HashEmbeddingModel()
+    if normalized == "resemblyzer":
+        return ResemblyzerEmbeddingModel()
+    raise ValueError(f"Unknown embedding model: {name}")
+
+
 def cosine_similarity(a: List[float], b: List[float]) -> float:
     if len(a) != len(b):
         raise ValueError("Embeddings must have the same length")
@@ -62,11 +109,7 @@ class VoiceprintStore:
 
     @property
     def _key(self) -> bytes:
-        key = os.environ.get(self.key_env_var)
-        if not key:
-            raise RuntimeError(f"Missing encryption key env var: {self.key_env_var}")
-        digest = hashlib.sha256(key.encode()).digest()
-        return digest
+        return require_voice_key(self.key_env_var)
 
     def save(self, embedding: List[float]) -> None:
         encoded = self._encrypt(embedding)
@@ -92,6 +135,20 @@ class VoiceprintStore:
         mask = self._key
         raw = bytes(b ^ mask[i % len(mask)] for i, b in enumerate(cipher))
         return [float(x) for x in raw.decode().split(",") if x]
+
+
+def require_voice_key(key_env_var: str = "JARVIS_VOICE_KEY") -> bytes:
+    """Fail-fast helper to ensure the voice key is present and usable."""
+
+    key = os.environ.get(key_env_var)
+    if not key:
+        raise RuntimeError(
+            f"Missing voice encryption key env var: {key_env_var}. "
+            "Generate a strong secret and export it (for example: "
+            f'SET {key_env_var}=\"your-random-key\" on Windows).'
+        )
+    digest = hashlib.sha256(key.encode()).digest()
+    return digest
 
 
 @dataclass
