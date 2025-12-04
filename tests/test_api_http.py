@@ -81,5 +81,16 @@ def test_api_enroll_and_transcribe(tmp_path):
     assert status == 200
     if isinstance(html, str):
         assert "<h1>JARVIS Console" in html
+    status, chat = _request(port, "POST", "/chat", {"message": "draft an email"})
+    assert status == 200
+    assert chat["text"] == "draft an email"
+    status, routed = _request(
+        port,
+        "POST",
+        "/route_audio",
+        {"frames": [frame], "sample_rate": 16000},
+    )
+    assert status == 200
+    assert "transcription" in routed
     server.shutdown()
     thread.join(timeout=1.0)

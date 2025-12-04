@@ -118,6 +118,17 @@ class VoiceAgent:
         payload["trace"] = self.tracer.export()
         return payload
 
+    def route_text(self, message: str) -> dict:
+        self.tracer.reset()
+        with self.tracer.span("intent"):
+            intent = self.intent_classifier.classify(message)
+        with self.tracer.span("route"):
+            payload = self.conversation.respond(intent, message, tools=self.tools.names())
+        payload["trace"] = self.tracer.export()
+        payload["text"] = message
+        payload["tool_catalog"] = self.tools.describe()
+        return payload
+
     def health(self) -> dict:
         env = audit_environment(["JARVIS_VOICE_KEY"])
         tools_status = tool_catalog_status(self.tools.describe())

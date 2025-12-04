@@ -96,6 +96,10 @@ class JarvisRequestHandler(BaseHTTPRequestHandler):
             return self._handle_enroll(data)
         if self.path == "/transcribe":
             return self._handle_transcribe(data)
+        if self.path == "/chat":
+            return self._handle_chat(data)
+        if self.path == "/route_audio":
+            return self._handle_route_audio(data)
         _json_response(self, 404, {"error": "not found"})
 
     def _handle_enroll(self, data: dict) -> None:
@@ -139,6 +143,31 @@ class JarvisRequestHandler(BaseHTTPRequestHandler):
             200,
             {"text": result.text, "confidence": result.confidence, "source": result.source},
         )
+
+    def _handle_chat(self, data: dict) -> None:
+        if JarvisRequestHandler.agent is None:
+            JarvisRequestHandler.agent = build_agent()
+        message = data.get("message")
+        if not message:
+            _json_response(self, 400, {"error": "missing field message"})
+            return
+        payload = self.agent.route_text(message)
+        _json_response(self, 200, payload)
+
+    def _handle_route_audio(self, data: dict) -> None:
+        if JarvisRequestHandler.agent is None:
+            JarvisRequestHandler.agent = build_agent()
+        try:
+            frames_b64 = data.get("frames", [])
+            frames = [base64.b64decode(f) for f in frames_b64]
+            sample_rate = int(data.get("sample_rate", 16000))
+        except Exception as exc:
+            _json_response(self, 400, {"error": f"invalid payload: {exc}"})
+            return
+        transcription = self.agent.asr.transcribe(frames, sample_rate)
+        payload = self.agent.route_text(transcription.text)
+        payload["transcription"] = {"text": transcription.text, "confidence": transcription.confidence, "source": transcription.source}
+        _json_response(self, 200, payload)
 
     def _prometheus_metrics(self) -> str:
         lines = []
