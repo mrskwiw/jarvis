@@ -100,6 +100,8 @@ class JarvisRequestHandler(BaseHTTPRequestHandler):
             return self._handle_chat(data)
         if self.path == "/route_audio":
             return self._handle_route_audio(data)
+        if self.path == "/tool_call":
+            return self._handle_tool_call(data)
         _json_response(self, 404, {"error": "not found"})
 
     def _handle_enroll(self, data: dict) -> None:
@@ -168,6 +170,23 @@ class JarvisRequestHandler(BaseHTTPRequestHandler):
         payload = self.agent.route_text(transcription.text)
         payload["transcription"] = {"text": transcription.text, "confidence": transcription.confidence, "source": transcription.source}
         _json_response(self, 200, payload)
+
+    def _handle_tool_call(self, data: dict) -> None:
+        if JarvisRequestHandler.agent is None:
+            JarvisRequestHandler.agent = build_agent()
+        try:
+            name = data["name"]
+            arguments = data.get("arguments", {})
+            owner_verified = bool(data.get("owner_verified", False))
+        except KeyError as exc:
+            _json_response(self, 400, {"error": f"missing field {exc.args[0]}"})
+            return
+        try:
+            result = self.agent.tools.execute(name, arguments, owner_verified=owner_verified)
+        except Exception as exc:
+            _json_response(self, 400, {"error": str(exc)})
+            return
+        _json_response(self, 200, result)
 
     def _prometheus_metrics(self) -> str:
         lines = []

@@ -84,6 +84,14 @@ def test_api_enroll_and_transcribe(tmp_path):
     status, chat = _request(port, "POST", "/chat", {"message": "draft an email"})
     assert status == 200
     assert chat["text"] == "draft an email"
+    status, tool_result = _request(
+        port,
+        "POST",
+        "/tool_call",
+        {"name": "email", "arguments": {"to": "a@b.com", "subject": "s", "body": "b"}, "owner_verified": True},
+    )
+    assert status == 200
+    assert tool_result["ok"] is True
     status, routed = _request(
         port,
         "POST",

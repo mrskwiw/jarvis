@@ -29,6 +29,16 @@ class ToolRegistry:
         if "free_tier_only" in schema:
             self._free_tier_only[name] = bool(schema["free_tier_only"])
 
+    def execute(self, name: str, arguments: Dict[str, object], owner_verified: bool = False) -> Dict[str, object]:
+        tool = self.get(name, owner_verified=owner_verified)
+        schema = self._schemas.get(name, {})
+        required = schema.get("input_schema", {}).get("required", [])
+        for field in required:
+            if field not in arguments:
+                raise ValueError(f"Missing required argument: {field}")
+        # For our stub tools, just return the arguments and the tool name.
+        return {"tool": name, "ok": True, "result": {"invoked": name, "args": arguments}}
+
     def get(self, name: str, owner_verified: bool = False) -> object:
         if self._require_owner and not owner_verified:
             raise PermissionError("Owner verification required for tool execution")

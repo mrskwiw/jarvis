@@ -15,6 +15,9 @@ from observability.metrics import MetricsSink
 from observability.health import tool_catalog_status
 from observability.tracing import TraceRecorder
 from tools.registry import ToolRegistry
+from tools.email import EmailService
+from tools.calls import CallService
+from tools.blogging import BloggingService
 from voice.listener import ContinuousListener, VerifiedAudio, load_wake_detector
 from voice.verification import (
     SpeakerVerifier,
@@ -70,6 +73,7 @@ class VoiceAgent:
                 "free_tier_only": True,
             },
         )
+        self.tools.register("email", lambda: EmailService())
         self.tools.register_schema(
             "call",
             {
@@ -82,6 +86,7 @@ class VoiceAgent:
                 "free_tier_only": True,
             },
         )
+        self.tools.register("call", lambda: CallService())
         self.tools.register_schema(
             "blog",
             {
@@ -94,6 +99,7 @@ class VoiceAgent:
                 "free_tier_only": True,
             },
         )
+        self.tools.register("blog", lambda: BloggingService())
         self.intent_classifier = IntentClassifier()
         self.router = LLMRouter(tool_registry=self.tools)
         self.conversation = ConversationController(self.router, logger=self.logger)

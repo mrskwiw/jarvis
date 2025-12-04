@@ -19,7 +19,8 @@ class LLMRouter:
         self.default_system_prompt = default_system_prompt or (
             "You are Jarvis, a helpful assistant. Maintain privacy (never leak secrets/voiceprints). "
             "Be cost-aware: use concise Haiku responses for simple tasks; use Sonnet for complex reasoning. "
-            "Use tools only when they clearly help the user."
+            "Use provided tools; do not invent tools unless explicitly told dynamic tool creation is enabled. "
+            "When intent confidence is low, ask a brief clarification. Follow JSON schemas strictly for tool calls."
         )
         self.tool_registry = tool_registry
 
@@ -57,6 +58,7 @@ class LLMRouter:
                     "name": name,
                     "description": schemas.get(name, {}).get("description", f"Invoke tool {name}"),
                     "input_schema": schemas.get(name, {}).get("input_schema", {"type": "object", "properties": {}}),
+                    "strict": True,
                 }
             )
         return definitions
